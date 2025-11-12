@@ -4,11 +4,12 @@ import { useEffect, useState } from "react";
 import { useAccount } from "wagmi";
 import { useAppKit } from "@reown/appkit/react";
 import NFTTable from "@/components/NFTTable";
-import { fetchNFTList, fetchEggleEnergyBalance, NFT } from "@/lib/api";
+import { fetchNFTList, fetchEggleEnergyBalance, NFT, NFTType } from "@/lib/api";
 
 export default function Home() {
   const { address, isConnected } = useAccount();
   const { open } = useAppKit();
+  const [activeTab, setActiveTab] = useState<NFTType>('pepe');
   const [nfts, setNfts] = useState<NFT[]>([]);
   const [eggleEnergyBalance, setEggleEnergyBalance] = useState<string>("0.00");
   const [loading, setLoading] = useState(false);
@@ -20,25 +21,25 @@ export default function Home() {
     setMounted(true);
   }, []);
 
-  // Fetch NFTs when wallet is connected
+  // Fetch NFTs when wallet is connected or tab changes
   useEffect(() => {
     if (isConnected && address) {
-      loadNFTs(address);
+      loadNFTs(address, activeTab);
     } else {
       setNfts([]);
       setError(null);
     }
-  }, [isConnected, address]);
+  }, [isConnected, address, activeTab]);
 
-  const loadNFTs = async (ownerAddress: string) => {
+  const loadNFTs = async (ownerAddress: string, nftType: NFTType = 'pepe') => {
     setLoading(true);
     setError(null);
     try {
       const [fetchedNFTs, balance] = await Promise.all([
-        fetchNFTList(ownerAddress),
+        fetchNFTList(ownerAddress, nftType),
         fetchEggleEnergyBalance(ownerAddress)
       ]);
-      console.log("💾 NFTs loaded:", fetchedNFTs.length);
+      console.log(`💾 ${nftType.toUpperCase()} NFTs loaded:`, fetchedNFTs.length);
       console.log("💰 Eggle Energy balance:", balance);
       setNfts(fetchedNFTs);
       setEggleEnergyBalance(balance);
@@ -181,10 +182,34 @@ export default function Home() {
         ) : (
           // NFT Table
           <div>
+            {/* Tabs */}
+            <div className="mb-6 flex items-center gap-4 border-b border-gray-200">
+              <button
+                onClick={() => setActiveTab('pepe')}
+                className={`px-6 py-3 font-semibold transition-all duration-200 border-b-2 ${
+                  activeTab === 'pepe'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                🐸 PEPE NFTs
+              </button>
+              <button
+                onClick={() => setActiveTab('eggle')}
+                className={`px-6 py-3 font-semibold transition-all duration-200 border-b-2 ${
+                  activeTab === 'eggle'
+                    ? 'border-purple-600 text-purple-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                🥚 EGGLE NFTs
+              </button>
+            </div>
+
             <div className="mb-6 flex items-center justify-between">
               <div>
                 <h2 className="text-2xl font-bold text-gray-900">
-                  Your Collection
+                  Your {activeTab === 'pepe' ? 'PEPE' : 'EGGLE'} Collection
                 </h2>
                 <p className="text-gray-600 mt-1">
                   Found {nfts.length} NFT{nfts.length !== 1 ? "s" : ""} in your
@@ -200,7 +225,7 @@ export default function Home() {
                   🍖 Feed All ({nfts.filter(n => n.health !== 1).length})
                 </button>
                 <button
-                  onClick={() => address && loadNFTs(address)}
+                  onClick={() => address && loadNFTs(address, activeTab)}
                   className="px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 font-medium rounded-lg shadow-sm border border-gray-300 transition-colors duration-200"
                 >
                   🔄 Refresh

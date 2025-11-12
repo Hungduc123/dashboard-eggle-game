@@ -47,8 +47,13 @@ export interface NFTListResponse {
 }
 
 const API_BASE_URL = "https://pepe-api.eggle.xyz";
-const NFT_CONTRACT_ADDRESS = "0x7e48eeb40d6083d7da004f662cd9a63e0a784d4b";
+const EGGLE_API_BASE_URL = "https://api.eggle.xyz";
+const PEPE_NFT_CONTRACT_ADDRESS = "0x7e48eeb40d6083d7da004f662cd9a63e0a784d4b";
+const EGGLE_NFT_CONTRACT_ADDRESS = "0x4e45cd58260f59babb528f2653b61e4623b3df99";
 const EGGLE_ENERGY_TOKEN_ADDRESS = "0x8a0e751e5d7a2861ca7cf16d9720337e40604982";
+
+export type NFTType = 'pepe' | 'eggle';
+
 
 // ERC20 ABI for balanceOf function
 const ERC20_ABI = [
@@ -93,9 +98,12 @@ export async function fetchEggleEnergyBalance(ownerAddress: string): Promise<str
 /**
  * Fetch NFT list for a given owner address
  */
-export async function fetchNFTList(ownerAddress: string, limit: number = 10000): Promise<NFT[]> {
-  const url = `${API_BASE_URL}/nft?owner=${ownerAddress}&limit=${limit}&nftAddresses=${NFT_CONTRACT_ADDRESS}`;
-  console.log("🔍 Fetching NFTs from:", url);
+export async function fetchNFTList(ownerAddress: string, nftType: NFTType = 'pepe', limit: number = 10000): Promise<NFT[]> {
+  const apiBaseUrl = nftType === 'pepe' ? API_BASE_URL : EGGLE_API_BASE_URL;
+  const contractAddress = nftType === 'pepe' ? PEPE_NFT_CONTRACT_ADDRESS : EGGLE_NFT_CONTRACT_ADDRESS;
+  
+  const url = `${apiBaseUrl}/nft?owner=${ownerAddress}&limit=${limit}&nftAddresses=${contractAddress}`;
+  console.log(`🔍 Fetching ${nftType.toUpperCase()} NFTs from:`, url);
   
   const response = await fetch(url);
   if (!response.ok) {
@@ -114,21 +122,21 @@ export async function fetchNFTList(ownerAddress: string, limit: number = 10000):
   
   // Handle possible response formats
   if (Array.isArray(data)) {
-    console.log(`✅ Found ${data.length} NFTs (direct array)`);
+    console.log(`✅ Found ${data.length} ${nftType.toUpperCase()} NFTs (direct array)`);
     return data;
   }
   
   if (data.items && Array.isArray(data.items)) {
-    console.log(`✅ Found ${data.items.length} NFTs (in .items, total: ${data.total})`);
+    console.log(`✅ Found ${data.items.length} ${nftType.toUpperCase()} NFTs (in .items, total: ${data.total})`);
     return data.items;
   }
   
   if (data.nfts && Array.isArray(data.nfts)) {
-    console.log(`✅ Found ${data.nfts.length} NFTs (nested in .nfts)`);
+    console.log(`✅ Found ${data.nfts.length} ${nftType.toUpperCase()} NFTs (nested in .nfts)`);
     return data.nfts;
   }
   
-  console.warn("⚠️ No NFTs found in response");
+  console.warn(`⚠️ No ${nftType.toUpperCase()} NFTs found in response`);
   return [];
 }
 
