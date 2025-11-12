@@ -172,7 +172,7 @@ export default function Home() {
                 No NFTs Found
               </h2>
               <p className="text-gray-600 mb-2">
-                You don't have any Eggle NFTs in your wallet yet.
+               {`You don't have any Eggle NFTs in your wallet yet.`}
               </p>
               <p className="text-sm text-gray-500">
                 NFTs from contract: 0x7e48...4d4b
