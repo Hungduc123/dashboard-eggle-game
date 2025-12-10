@@ -1,20 +1,42 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAccount } from "wagmi";
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { useAppKit } from "@reown/appkit/react";
+import { parseUnits, type Address } from "viem";
 import NFTTable from "@/components/NFTTable";
 import { fetchNFTList, fetchEggleEnergyBalance, NFT, NFTType } from "@/lib/api";
+
+const EGGLE_ENERGY_TOKEN_ADDRESS = "0x8a0e751e5d7a2861ca7cf16d9720337e40604982" as Address;
+
+// ERC20 ABI for transfer function
+const ERC20_TRANSFER_ABI = [
+  {
+    name: 'transfer',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'to', type: 'address' },
+      { name: 'amount', type: 'uint256' }
+    ],
+    outputs: [{ name: '', type: 'bool' }]
+  }
+] as const;
 
 export default function Home() {
   const { address, isConnected } = useAccount();
   const { open } = useAppKit();
+  const { writeContractAsync } = useWriteContract();
   const [activeTab, setActiveTab] = useState<NFTType>('pepe');
   const [nfts, setNfts] = useState<NFT[]>([]);
   const [eggleEnergyBalance, setEggleEnergyBalance] = useState<string>("0.00");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [selectedNFTs, setSelectedNFTs] = useState<Set<string>>(new Set());
+  const [feedAmount, setFeedAmount] = useState<number>(10);
+  const [isFeedingInProgress, setIsFeedingInProgress] = useState(false);
+  const [feedingStatus, setFeedingStatus] = useState<string>("");
 
   // Đảm bảo component đã mounted trước khi hiển thị wallet info
   useEffect(() => {
@@ -31,9 +53,30 @@ export default function Home() {
     }
   }, [isConnected, address, activeTab]);
 
+  const handleToggleSelect = (nftId: string) => {
+    setSelectedNFTs(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(nftId)) {
+        newSet.delete(nftId);
+      } else {
+        newSet.add(nftId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = () => {
+    setSelectedNFTs(new Set(nfts.map(nft => nft.nftId)));
+  };
+
+  const handleDeselectAll = () => {
+    setSelectedNFTs(new Set());
+  };
+
   const loadNFTs = async (ownerAddress: string, nftType: NFTType = 'pepe') => {
     setLoading(true);
     setError(null);
+    setSelectedNFTs(new Set());
     try {
       const [fetchedNFTs, balance] = await Promise.all([
         fetchNFTList(ownerAddress, nftType),
@@ -57,16 +100,96 @@ export default function Home() {
     alert(`Feeding NFT #${nftId} - Smart contract integration coming soon!`);
   };
 
-  const handleFeedAll = async () => {
-    const hungryNFTs = nfts.filter(nft => nft.health !== 1);
-    if (hungryNFTs.length === 0) {
-      alert("All NFTs are already Full! 🎉");
+  const handleFeedSelected = async () => {
+    if (selectedNFTs.size === 0) {
+      setFeedingStatus("⚠️ Please select NFTs to feed!");
+      setTimeout(() => setFeedingStatus(""), 3000);
+      return;
+    }
+
+    if (!address) {
+      setFeedingStatus("⚠️ Please connect your wallet first!");
+      setTimeout(() => setFeedingStatus(""), 3000);
       return;
     }
     
-    console.log("🍖 Feeding all hungry NFTs:", hungryNFTs.length);
-    // TODO: Implement batch feed logic with smart contract
-    alert(`Feeding ${hungryNFTs.length} NFTs - Smart contract integration coming soon!`);
+    const selectedNFTsData = nfts.filter(nft => selectedNFTs.has(nft.nftId));
+    const tbaAddresses = selectedNFTsData.map(nft => nft.tbaAddress);
+    
+    console.log(`🍖 Feeding ${selectedNFTs.size} NFTs with ${feedAmount} ENG each`);
+    console.log("TBA Addresses:", tbaAddresses);
+    console.log("Total amount:", selectedNFTs.size * feedAmount, "ENG");
+
+    const totalAmount = selectedNFTs.size * feedAmount;
+    const userBalance = parseFloat(eggleEnergyBalance);
+
+    if (userBalance < totalAmount) {
+      setFeedingStatus(`⚠️ Insufficient balance! Required: ${totalAmount} ENG, Your balance: ${userBalance} ENG`);
+      setTimeout(() => setFeedingStatus(""), 5000);
+      return;
+    }
+
+    setIsFeedingInProgress(true);
+    setFeedingStatus(`Starting to feed ${selectedNFTs.size} NFTs...`);
+
+    let successCount = 0;
+    let failCount = 0;
+    const amount = parseUnits(feedAmount.toString(), 18); // Convert to wei (18 decimals)
+
+    try {
+      for (let i = 0; i < tbaAddresses.length; i++) {
+        const tbaAddress = tbaAddresses[i];
+        const nft = selectedNFTsData[i];
+        
+        try {
+          setFeedingStatus(`Feeding NFT ${i + 1}/${tbaAddresses.length}: ${nft.name} (#${nft.nftId})...`);
+          
+          console.log(`Sending ${feedAmount} ENG to ${tbaAddress}...`);
+          
+          const txHash = await writeContractAsync({
+            address: EGGLE_ENERGY_TOKEN_ADDRESS,
+            abi: ERC20_TRANSFER_ABI,
+            functionName: 'transfer',
+            args: [tbaAddress as Address, amount],
+          });
+
+          console.log(`✅ Transaction sent: ${txHash}`);
+          setFeedingStatus(`✅ Transaction sent for ${nft.name}. Waiting for next...`);
+          
+          // Wait a bit before next transaction
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          successCount++;
+          console.log(`✅ Successfully fed NFT #${nft.nftId}`);
+          
+        } catch (error) {
+          console.error(`❌ Failed to feed NFT #${nft.nftId}:`, error);
+          failCount++;
+          setFeedingStatus(`❌ Failed to feed ${nft.name}. Continuing...`);
+          await new Promise(resolve => setTimeout(resolve, 1500));
+        }
+      }
+
+      // Final summary
+      setFeedingStatus(`✅ Feeding Complete! Success: ${successCount}, Failed: ${failCount}`);
+      
+      // Reload NFTs and balance
+      if (address) {
+        await loadNFTs(address, activeTab);
+      }
+      
+      // Clear selection
+      setSelectedNFTs(new Set());
+
+      setTimeout(() => setFeedingStatus(""), 5000);
+
+    } catch (error) {
+      console.error("Error during feeding:", error);
+      setFeedingStatus(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setTimeout(() => setFeedingStatus(""), 5000);
+    } finally {
+      setIsFeedingInProgress(false);
+    }
   };
 
   return (
@@ -213,17 +336,10 @@ export default function Home() {
                 </h2>
                 <p className="text-gray-600 mt-1">
                   Found {nfts.length} NFT{nfts.length !== 1 ? "s" : ""} in your
-                  wallet • {nfts.filter(n => n.health !== 1).length} hungry
+                  wallet • {nfts.filter(n => n.health !== 1).length} hungry • {selectedNFTs.size} selected
                 </p>
               </div>
               <div className="flex items-center gap-3">
-                <button
-                  onClick={handleFeedAll}
-                  disabled={nfts.filter(n => n.health !== 1).length === 0}
-                  className="px-6 py-2 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all duration-200"
-                >
-                  🍖 Feed All ({nfts.filter(n => n.health !== 1).length})
-                </button>
                 <button
                   onClick={() => address && loadNFTs(address, activeTab)}
                   className="px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 font-medium rounded-lg shadow-sm border border-gray-300 transition-colors duration-200"
@@ -233,7 +349,88 @@ export default function Home() {
               </div>
             </div>
 
-            <NFTTable nfts={nfts} onFeed={handleFeed} />
+            {/* Amount Selector and Feed Button */}
+            <div className="mb-4 bg-white rounded-lg shadow-md p-4 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <span className="text-sm font-semibold text-gray-700">Amount per NFT:</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setFeedAmount(10)}
+                    disabled={isFeedingInProgress}
+                    className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                      feedAmount === 10
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  >
+                    10 ENG
+                  </button>
+                  <button
+                    onClick={() => setFeedAmount(20)}
+                    disabled={isFeedingInProgress}
+                    className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                      feedAmount === 20
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  >
+                    20 ENG
+                  </button>
+                  <button
+                    onClick={() => setFeedAmount(30)}
+                    disabled={isFeedingInProgress}
+                    className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                      feedAmount === 30
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  >
+                    30 ENG
+                  </button>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="text-right">
+                  <p className="text-xs text-gray-500">Total Amount</p>
+                  <p className="text-lg font-bold text-purple-900">
+                    {selectedNFTs.size * feedAmount} ENG
+                  </p>
+                </div>
+                <button
+                  onClick={handleFeedSelected}
+                  disabled={selectedNFTs.size === 0 || isFeedingInProgress}
+                  className="px-6 py-2 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all duration-200"
+                >
+                  {isFeedingInProgress ? (
+                    <span className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                      Feeding...
+                    </span>
+                  ) : (
+                    `🍖 Feed Selected (${selectedNFTs.size})`
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Feeding Status */}
+            {feedingStatus && (
+              <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-center gap-3">
+                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-600 border-t-transparent"></div>
+                  <p className="text-sm font-medium text-blue-900">{feedingStatus}</p>
+                </div>
+              </div>
+            )}
+
+            <NFTTable 
+              nfts={nfts} 
+              onFeed={handleFeed}
+              selectedNFTs={selectedNFTs}
+              onToggleSelect={handleToggleSelect}
+              onSelectAll={handleSelectAll}
+              onDeselectAll={handleDeselectAll}
+            />
           </div>
         )}
       </main>

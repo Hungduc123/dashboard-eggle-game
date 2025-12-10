@@ -6,9 +6,15 @@ import NFTImage from "./NFTImage";
 interface NFTTableProps {
   nfts: NFT[];
   onFeed: (nftId: string) => void;
+  selectedNFTs: Set<string>;
+  onToggleSelect: (nftId: string) => void;
+  onSelectAll: () => void;
+  onDeselectAll: () => void;
 }
 
-export default function NFTTable({ nfts, onFeed }: NFTTableProps) {
+export default function NFTTable({ nfts, onFeed, selectedNFTs, onToggleSelect, onSelectAll, onDeselectAll }: NFTTableProps) {
+  const allSelected = nfts.length > 0 && nfts.every(nft => selectedNFTs.has(nft.nftId));
+  const someSelected = nfts.some(nft => selectedNFTs.has(nft.nftId));
   if (nfts.length === 0) {
     return (
       <div className="text-center py-12">
@@ -22,9 +28,19 @@ export default function NFTTable({ nfts, onFeed }: NFTTableProps) {
       <table className="min-w-full bg-white border border-gray-200 rounded-lg overflow-hidden shadow-md">
         <thead className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
           <tr>
+            <th className="px-4 py-3 text-center text-sm font-semibold">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={allSelected ? onDeselectAll : onSelectAll}
+                className="w-4 h-4 cursor-pointer"
+              />
+            </th>
+            <th className="px-4 py-3 text-center text-sm font-semibold">#</th>
             <th className="px-4 py-3 text-left text-sm font-semibold">Image</th>
             <th className="px-4 py-3 text-left text-sm font-semibold">Name</th>
             <th className="px-4 py-3 text-left text-sm font-semibold">Token ID</th>
+            <th className="px-4 py-3 text-left text-sm font-semibold">TBA Address</th>
             <th className="px-4 py-3 text-left text-sm font-semibold">Type</th>
             <th className="px-4 py-3 text-left text-sm font-semibold">Level</th>
             <th className="px-4 py-3 text-left text-sm font-semibold">Health</th>
@@ -34,7 +50,7 @@ export default function NFTTable({ nfts, onFeed }: NFTTableProps) {
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200">
-          {nfts.map((nft) => {
+          {nfts.map((nft, index) => {
             const healthStatus = getHealthStatus(nft.health);
             const pickItem = getPickItem(nft);
             const isFull = nft.health === 1;
@@ -44,6 +60,23 @@ export default function NFTTable({ nfts, onFeed }: NFTTableProps) {
                 key={nft._id}
                 className="hover:bg-gray-50 transition-colors"
               >
+                {/* Checkbox */}
+                <td className="px-4 py-3 text-center">
+                  <input
+                    type="checkbox"
+                    checked={selectedNFTs.has(nft.nftId)}
+                    onChange={() => onToggleSelect(nft.nftId)}
+                    className="w-4 h-4 cursor-pointer"
+                  />
+                </td>
+
+                {/* Row Number */}
+                <td className="px-4 py-3 text-center">
+                  <span className="text-sm font-semibold text-gray-600">
+                    {index + 1}
+                  </span>
+                </td>
+
                 {/* Image */}
                 <td className="px-4 py-3">
                   <div className="w-16 h-16 rounded-lg overflow-hidden border-2 border-gray-200 relative">
@@ -65,6 +98,22 @@ export default function NFTTable({ nfts, onFeed }: NFTTableProps) {
                   <span className="inline-block px-2 py-1 text-xs font-mono bg-blue-50 text-blue-700 rounded border border-blue-200">
                     #{nft.nftId}
                   </span>
+                </td>
+
+                {/* TBA Address */}
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono text-gray-600">
+                      {nft.tbaAddress.slice(0, 6)}...{nft.tbaAddress.slice(-4)}
+                    </span>
+                    <button
+                      onClick={() => navigator.clipboard.writeText(nft.tbaAddress)}
+                      className="text-gray-400 hover:text-blue-600 transition-colors"
+                      title="Copy address"
+                    >
+                      📋
+                    </button>
+                  </div>
                 </td>
 
                 {/* Type */}
