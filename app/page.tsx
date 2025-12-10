@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useAccount, useWriteContract } from "wagmi";
 import { useAppKit } from "@reown/appkit/react";
 import { parseUnits, type Address } from "viem";
 import NFTTable from "@/components/NFTTable";

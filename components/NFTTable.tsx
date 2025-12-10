@@ -14,7 +14,6 @@ interface NFTTableProps {
 
 export default function NFTTable({ nfts, onFeed, selectedNFTs, onToggleSelect, onSelectAll, onDeselectAll }: NFTTableProps) {
   const allSelected = nfts.length > 0 && nfts.every(nft => selectedNFTs.has(nft.nftId));
-  const someSelected = nfts.some(nft => selectedNFTs.has(nft.nftId));
   if (nfts.length === 0) {
     return (
       <div className="text-center py-12">
