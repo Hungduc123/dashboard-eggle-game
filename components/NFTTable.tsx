@@ -147,6 +147,9 @@ export default function NFTTable({ nfts, selectedNFTs, onToggleSelect, onSelectA
                         <span className="text-xs font-medium text-green-700">
                           {nft.pickItem.value}
                         </span>
+                        {nft.pickItem.claimed && (
+                          <span className="text-sm" title="Claimed">✅</span>
+                        )}
                       </div>
                       <span className="text-xs text-gray-500">{nft.pickItem.type || 'tokens'}</span>
                     </div>
