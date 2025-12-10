@@ -44,6 +44,7 @@ export default function NFTTable({ nfts, selectedNFTs, onToggleSelect, onSelectA
             <th className="px-4 py-3 text-left text-sm font-semibold">Health</th>
             <th className="px-4 py-3 text-left text-sm font-semibold">Pick Item</th>
             <th className="px-4 py-3 text-left text-sm font-semibold">Shits</th>
+            <th className="px-4 py-3 text-left text-sm font-semibold">Items</th>
             <th className="px-4 py-3 text-center text-sm font-semibold">Action</th>
           </tr>
         </thead>
@@ -144,7 +145,7 @@ export default function NFTTable({ nfts, selectedNFTs, onToggleSelect, onSelectA
                     <div className="flex flex-col gap-0.5">
                       <div className="flex items-center gap-1">
                         <span className="text-sm">🎁</span>
-                        <span className="text-xs font-medium text-green-700">
+                        <span className="text-xs font-medium text-green-700 max-w-[100px] truncate">
                           {nft.pickItem.value}
                         </span>
                         {nft.pickItem.claimed && (
@@ -164,6 +165,21 @@ export default function NFTTable({ nfts, selectedNFTs, onToggleSelect, onSelectA
                     <div className="flex items-center gap-1">
                       <span className="text-sm">💩</span>
                       <span className="text-xs font-semibold text-amber-700">{nft.shits}</span>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-gray-400">-</span>
+                  )}
+                </td>
+
+                {/* Items */}
+                <td className="px-4 py-3">
+                  {nft.items && nft.items.length > 0 ? (
+                    <div className="flex flex-col gap-0.5">
+                      {nft.items.map((item: { name?: string; type?: string }, idx: number) => (
+                        <span key={idx} className="text-xs text-gray-700">
+                          {item.name || item.type || 'Unknown'}
+                        </span>
+                      ))}
                     </div>
                   ) : (
                     <span className="text-xs text-gray-400">-</span>
