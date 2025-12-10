@@ -454,6 +454,7 @@ export default function Home() {
               onToggleSelect={handleToggleSelect}
               onSelectAll={handleSelectAll}
               onDeselectAll={handleDeselectAll}
+              onPickSuccess={() => address && loadNFTs(address, activeTab)}
             />
           </div>
         )}

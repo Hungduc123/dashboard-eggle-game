@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { NFT, getHealthStatus, getHealthBadgeColor } from "@/lib/api";
 import NFTImage from "./NFTImage";
 
@@ -9,10 +10,58 @@ interface NFTTableProps {
   onToggleSelect: (nftId: string) => void;
   onSelectAll: () => void;
   onDeselectAll: () => void;
+  onPickSuccess?: () => void;
 }
 
-export default function NFTTable({ nfts, selectedNFTs, onToggleSelect, onSelectAll, onDeselectAll }: NFTTableProps) {
+export default function NFTTable({ nfts, selectedNFTs, onToggleSelect, onSelectAll, onDeselectAll, onPickSuccess }: NFTTableProps) {
   const allSelected = nfts.length > 0 && nfts.every(nft => selectedNFTs.has(nft.nftId));
+  const [pickingItems, setPickingItems] = useState<Set<string>>(new Set());
+
+  const handlePickItem = async (nft: NFT) => {
+    setPickingItems(prev => new Set(prev).add(nft.nftId));
+    
+    try {
+      const payload = {
+        chainId: 8453,
+        address: nft.nftAddress.toLowerCase(),
+        id: nft.nftId.toString()
+      };
+      
+      console.log('🎁 Picking item for NFT:', payload);
+      
+      const response = await fetch('https://pepe-api.eggle.xyz/nft/pick-item', {
+        method: 'POST',
+        headers: {
+          'accept': '*/*',
+          'content-type': 'application/json',
+          'from-bacoor-with-love': 'true',
+          'origin': 'https://eggle.xyz',
+          'referer': 'https://eggle.xyz/',
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log(`✅ Successfully picked item for NFT #${nft.nftId}:`, result);
+        alert(`✅ Successfully picked item!`);
+        onPickSuccess?.();
+      } else {
+        const error = await response.text();
+        console.error(`❌ Failed to pick item for NFT #${nft.nftId}:`, response.status, error);
+        alert(`Failed to pick item (${response.status}): ${error}`);
+      }
+    } catch (error) {
+      console.error(`❌ Error picking item for NFT #${nft.nftId}:`, error);
+      alert(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setPickingItems(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(nft.nftId);
+        return newSet;
+      });
+    }
+  };
   if (nfts.length === 0) {
     return (
       <div className="text-center py-12">
@@ -142,7 +191,7 @@ export default function NFTTable({ nfts, selectedNFTs, onToggleSelect, onSelectA
                 {/* Pick Item */}
                 <td className="px-4 py-3">
                   {nft.pickItem && parseFloat(nft.pickItem.value) > 0 ? (
-                    <div className="flex flex-col gap-0.5">
+                    <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-1">
                         <span className="text-sm">🎁</span>
                         <span className="text-xs font-medium text-green-700 max-w-[100px] truncate">
@@ -153,6 +202,15 @@ export default function NFTTable({ nfts, selectedNFTs, onToggleSelect, onSelectA
                         )}
                       </div>
                       <span className="text-xs text-gray-500">{nft.pickItem.type || 'tokens'}</span>
+                      {!nft.pickItem.claimed && !nft.pickItem.picked && (
+                        <button
+                          onClick={() => handlePickItem(nft)}
+                          disabled={pickingItems.has(nft.nftId)}
+                          className="px-2 py-1 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed text-white text-xs font-semibold rounded shadow-sm transition-all"
+                        >
+                          {pickingItems.has(nft.nftId) ? '⏳ Picking...' : '🎁 Pick'}
+                        </button>
+                      )}
                     </div>
                   ) : (
                     <span className="text-xs text-gray-400">-</span>
