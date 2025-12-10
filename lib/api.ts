@@ -36,6 +36,8 @@ export interface NFT {
   };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   items?: any[];
+  shits?: number;
+  detailLoaded?: boolean;
 }
 
 export interface NFTListResponse {
@@ -207,4 +209,36 @@ export function getAttributeValue(
     (a) => a.trait_type.toLowerCase() === traitType.toLowerCase()
   );
   return attr?.value;
+}
+
+/**
+ * Fetch detailed NFT information
+ */
+export async function fetchNFTDetail(
+  contractAddress: string,
+  nftId: string,
+  nftType: NFTType = 'pepe'
+): Promise<Partial<NFT>> {
+  const apiBaseUrl = nftType === 'pepe' ? API_BASE_URL : EGGLE_API_BASE_URL;
+  const url = `${apiBaseUrl}/nft/8453/${contractAddress}/${nftId}`;
+  
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.error(`Failed to fetch detail for NFT #${nftId}`);
+      return { detailLoaded: false };
+    }
+    
+    const data = await response.json();
+    
+    return {
+      pickItem: data.pickItem,
+      shits: data?.shits?.length || 0,
+      items: data.items,
+      detailLoaded: true,
+    };
+  } catch (error) {
+    console.error(`Error fetching detail for NFT #${nftId}:`, error);
+    return { detailLoaded: false };
+  }
 }

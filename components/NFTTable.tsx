@@ -1,18 +1,17 @@
 "use client";
 
-import { NFT, getHealthStatus, getHealthBadgeColor, getPickItem } from "@/lib/api";
+import { NFT, getHealthStatus, getHealthBadgeColor } from "@/lib/api";
 import NFTImage from "./NFTImage";
 
 interface NFTTableProps {
   nfts: NFT[];
-  onFeed: (nftId: string) => void;
   selectedNFTs: Set<string>;
   onToggleSelect: (nftId: string) => void;
   onSelectAll: () => void;
   onDeselectAll: () => void;
 }
 
-export default function NFTTable({ nfts, onFeed, selectedNFTs, onToggleSelect, onSelectAll, onDeselectAll }: NFTTableProps) {
+export default function NFTTable({ nfts, selectedNFTs, onToggleSelect, onSelectAll, onDeselectAll }: NFTTableProps) {
   const allSelected = nfts.length > 0 && nfts.every(nft => selectedNFTs.has(nft.nftId));
   if (nfts.length === 0) {
     return (
@@ -44,15 +43,13 @@ export default function NFTTable({ nfts, onFeed, selectedNFTs, onToggleSelect, o
             <th className="px-4 py-3 text-left text-sm font-semibold">Level</th>
             <th className="px-4 py-3 text-left text-sm font-semibold">Health</th>
             <th className="px-4 py-3 text-left text-sm font-semibold">Pick Item</th>
-            <th className="px-4 py-3 text-left text-sm font-semibold">Items</th>
+            <th className="px-4 py-3 text-left text-sm font-semibold">Shits</th>
             <th className="px-4 py-3 text-center text-sm font-semibold">Action</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200">
           {nfts.map((nft, index) => {
             const healthStatus = getHealthStatus(nft.health);
-            const pickItem = getPickItem(nft);
-            const isFull = nft.health === 1;
 
             return (
               <tr
@@ -143,24 +140,27 @@ export default function NFTTable({ nfts, onFeed, selectedNFTs, onToggleSelect, o
 
                 {/* Pick Item */}
                 <td className="px-4 py-3">
-                  {pickItem !== "None" ? (
-                    <div className="flex items-center gap-1">
-                      <span className="text-sm">🎁</span>
-                      <span className="text-xs font-medium text-green-700">{pickItem}</span>
+                  {nft.pickItem && parseFloat(nft.pickItem.value) > 0 ? (
+                    <div className="flex flex-col gap-0.5">
+                      <div className="flex items-center gap-1">
+                        <span className="text-sm">🎁</span>
+                        <span className="text-xs font-medium text-green-700">
+                          {nft.pickItem.value}
+                        </span>
+                      </div>
+                      <span className="text-xs text-gray-500">{nft.pickItem.type || 'tokens'}</span>
                     </div>
                   ) : (
                     <span className="text-xs text-gray-400">-</span>
                   )}
                 </td>
 
-                {/* Items Count */}
+                {/* Shits */}
                 <td className="px-4 py-3">
-                  {nft.items && nft.items.length > 0 ? (
+                  {nft.shits !== undefined && nft.shits > 0 ? (
                     <div className="flex items-center gap-1">
-                      <span className="text-sm">🎒</span>
-                      <span className="text-xs font-semibold text-gray-700">
-                        {nft.items.length} item{nft.items.length > 1 ? 's' : ''}
-                      </span>
+                      <span className="text-sm">💩</span>
+                      <span className="text-xs font-semibold text-amber-700">{nft.shits}</span>
                     </div>
                   ) : (
                     <span className="text-xs text-gray-400">-</span>
@@ -169,18 +169,14 @@ export default function NFTTable({ nfts, onFeed, selectedNFTs, onToggleSelect, o
 
                 {/* Action */}
                 <td className="px-4 py-3 text-center">
-                  {!isFull ? (
-                    <button
-                      onClick={() => onFeed(nft.nftId)}
-                      className="px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white text-sm font-semibold rounded-lg shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105"
-                    >
-                      🍖 Feed
-                    </button>
-                  ) : (
-                    <span className="inline-block px-4 py-2 bg-gray-100 text-gray-400 text-sm font-semibold rounded-lg">
-                      ✓ Full
-                    </span>
-                  )}
+                  <a
+                    href={`https://eggle.xyz/en/nft/8453/${nft.nftAddress}/${nft.nftId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white text-sm font-semibold rounded-lg shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105"
+                  >
+                    🔗 View
+                  </a>
                 </td>
               </tr>
             );

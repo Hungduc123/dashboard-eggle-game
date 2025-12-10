@@ -5,7 +5,7 @@ import { useAccount, useWriteContract } from "wagmi";
 import { useAppKit } from "@reown/appkit/react";
 import { parseUnits, type Address } from "viem";
 import NFTTable from "@/components/NFTTable";
-import { fetchNFTList, fetchEggleEnergyBalance, NFT, NFTType } from "@/lib/api";
+import { fetchNFTList, fetchEggleEnergyBalance, fetchNFTDetail, NFT, NFTType } from "@/lib/api";
 
 const EGGLE_ENERGY_TOKEN_ADDRESS = "0x8a0e751e5d7a2861ca7cf16d9720337e40604982" as Address;
 
@@ -51,6 +51,7 @@ export default function Home() {
       setNfts([]);
       setError(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isConnected, address, activeTab]);
 
   const handleToggleSelect = (nftId: string) => {
@@ -84,8 +85,36 @@ export default function Home() {
       ]);
       console.log(`💾 ${nftType.toUpperCase()} NFTs loaded:`, fetchedNFTs.length);
       console.log("💰 Eggle Energy balance:", balance);
+      
+      // Set NFTs immediately for faster UI response
       setNfts(fetchedNFTs);
       setEggleEnergyBalance(balance);
+      
+      // Fetch detailed info for each NFT in background (limit concurrent requests)
+      const batchSize = 5; // Fetch 5 at a time to avoid overwhelming the API
+      for (let i = 0; i < fetchedNFTs.length; i += batchSize) {
+        const batch = fetchedNFTs.slice(i, i + batchSize);
+        const detailPromises = batch.map(async (nft) => {
+          const detail = await fetchNFTDetail(nft.nftAddress, nft.nftId, nftType);
+          return { ...nft, ...detail };
+        });
+        
+        const detailedBatch = await Promise.all(detailPromises);
+        
+        // Update NFTs incrementally
+        setNfts(prev => {
+          const updated = [...prev];
+          detailedBatch.forEach(detailedNft => {
+            const index = updated.findIndex(n => n.nftId === detailedNft.nftId);
+            if (index !== -1) {
+              updated[index] = detailedNft;
+            }
+          });
+          return updated;
+        });
+      }
+      
+      console.log(`✅ Loaded details for ${fetchedNFTs.length} NFTs`);
     } catch (err) {
       console.error("Failed to load NFTs:", err);
       setError("Failed to load NFTs. Please try again later.");
@@ -94,11 +123,7 @@ export default function Home() {
     }
   };
 
-  const handleFeed = async (nftId: string) => {
-    console.log("🍖 Feeding NFT:", nftId);
-    // TODO: Implement feed logic with smart contract
-    alert(`Feeding NFT #${nftId} - Smart contract integration coming soon!`);
-  };
+
 
   const handleFeedSelected = async () => {
     if (selectedNFTs.size === 0) {
@@ -425,7 +450,6 @@ export default function Home() {
 
             <NFTTable 
               nfts={nfts} 
-              onFeed={handleFeed}
               selectedNFTs={selectedNFTs}
               onToggleSelect={handleToggleSelect}
               onSelectAll={handleSelectAll}
