@@ -182,7 +182,7 @@ export default function Home() {
           setFeedingStatus(`✅ Transaction sent for ${nft.name}. Waiting for next...`);
           
           // Wait a bit before next transaction
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          await new Promise(resolve => setTimeout(resolve, 5000));
           
           successCount++;
           console.log(`✅ Successfully fed NFT #${nft.nftId}`);
@@ -191,7 +191,7 @@ export default function Home() {
           console.error(`❌ Failed to feed NFT #${nft.nftId}:`, error);
           failCount++;
           setFeedingStatus(`❌ Failed to feed ${nft.name}. Continuing...`);
-          await new Promise(resolve => setTimeout(resolve, 1500));
+          await new Promise(resolve => setTimeout(resolve, 5000));
         }
       }
 
