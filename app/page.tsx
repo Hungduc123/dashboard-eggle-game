@@ -8,6 +8,7 @@ import NFTTable from "@/components/NFTTable";
 import { fetchNFTList, fetchEggleEnergyBalance, fetchNFTDetail, NFT, NFTType } from "@/lib/api";
 
 const EGGLE_ENERGY_TOKEN_ADDRESS = "0x8a0e751e5d7a2861ca7cf16d9720337e40604982" as Address;
+const BULK_TRANSFER_ADDRESS = "0x0B2aB0Ed04Cc9367A88F1F22d0aD0E1f6e1Fd64D" as Address;
 
 // ERC20 ABI for transfer function
 const ERC20_TRANSFER_ABI = [
@@ -20,6 +21,33 @@ const ERC20_TRANSFER_ABI = [
       { name: 'amount', type: 'uint256' }
     ],
     outputs: [{ name: '', type: 'bool' }]
+  }
+] as const;
+
+// ERC721 ABI for transferFrom function
+const ERC721_TRANSFER_ABI = [
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "from",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "to",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "tokenId",
+        "type": "uint256"
+      }
+    ],
+    "name": "transferFrom",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   }
 ] as const;
 
@@ -37,6 +65,8 @@ export default function Home() {
   const [feedAmount, setFeedAmount] = useState<number>(10);
   const [isFeedingInProgress, setIsFeedingInProgress] = useState(false);
   const [feedingStatus, setFeedingStatus] = useState<string>("");
+  const [isTransferringInProgress, setIsTransferringInProgress] = useState(false);
+  const [transferStatus, setTransferStatus] = useState<string>("");
 
   // Đảm bảo component đã mounted trước khi hiển thị wallet info
   useEffect(() => {
@@ -124,6 +154,93 @@ export default function Home() {
   };
 
 
+
+  const handleBulkTransfer = async () => {
+    if (selectedNFTs.size === 0) {
+      setTransferStatus("⚠️ Please select NFTs to transfer!");
+      setTimeout(() => setTransferStatus(""), 3000);
+      return;
+    }
+
+    if (!address) {
+      setTransferStatus("⚠️ Please connect your wallet first!");
+      setTimeout(() => setTransferStatus(""), 3000);
+      return;
+    }
+
+    const selectedNFTsData = nfts.filter(nft => selectedNFTs.has(nft.nftId));
+    
+    const confirmMessage = `Bạn có chắc muốn chuyển ${selectedNFTs.size} NFTs đến địa chỉ ${BULK_TRANSFER_ADDRESS}?\n\nNFTs:\n${selectedNFTsData.map(nft => `- ${nft.name} (#${nft.nftId})`).join('\n')}`;
+    
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
+    console.log(`📤 Transferring ${selectedNFTs.size} NFTs to ${BULK_TRANSFER_ADDRESS}`);
+    console.log("NFTs to transfer:", selectedNFTsData.map(n => ({ id: n.nftId, name: n.name })));
+
+    setIsTransferringInProgress(true);
+    setTransferStatus(`Starting to transfer ${selectedNFTs.size} NFTs...`);
+
+    let successCount = 0;
+    let failCount = 0;
+
+    try {
+      for (let i = 0; i < selectedNFTsData.length; i++) {
+        const nft = selectedNFTsData[i];
+            console.log("🚀 ~ handleBulkTransfer ~ nft.nftAddress:", nft.nftAddress)
+
+        
+        try {
+          setTransferStatus(`Transferring NFT ${i + 1}/${selectedNFTsData.length}: ${nft.name} (#${nft.nftId})...`);
+          
+          console.log(`Transferring NFT #${nft.nftId} from ${address} to ${BULK_TRANSFER_ADDRESS}...`);
+          
+          const txHash = await writeContractAsync({
+            address: nft.nftAddress as Address,
+            abi: ERC721_TRANSFER_ABI,
+            functionName: 'transferFrom',
+            args: [address, BULK_TRANSFER_ADDRESS, BigInt(nft.nftId)],
+          });
+
+          console.log(`✅ Transfer transaction sent: ${txHash}`);
+          setTransferStatus(`✅ Transaction sent for ${nft.name}. Waiting for next...`);
+          
+          // Wait a bit before next transaction
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          
+          successCount++;
+          console.log(`✅ Successfully transferred NFT #${nft.nftId}`);
+          
+        } catch (error) {
+          console.error(`❌ Failed to transfer NFT #${nft.nftId}:`, error);
+          failCount++;
+          setTransferStatus(`❌ Failed to transfer ${nft.name}. Continuing...`);
+          await new Promise(resolve => setTimeout(resolve, 3000));
+        }
+      }
+
+      // Final summary
+      setTransferStatus(`✅ Transfer Complete! Success: ${successCount}, Failed: ${failCount}`);
+      
+      // Reload NFTs
+      if (address) {
+        await loadNFTs(address, activeTab);
+      }
+      
+      // Clear selection
+      setSelectedNFTs(new Set());
+
+      setTimeout(() => setTransferStatus(""), 5000);
+
+    } catch (error) {
+      console.error("Error during transfer:", error);
+      setTransferStatus(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setTimeout(() => setTransferStatus(""), 5000);
+    } finally {
+      setIsTransferringInProgress(false);
+    }
+  };
 
   const handleFeedSelected = async () => {
     if (selectedNFTs.size === 0) {
@@ -374,6 +491,38 @@ export default function Home() {
               </div>
             </div>
 
+            {/* Bulk Transfer Button */}
+            <div className="mb-4 bg-gradient-to-r from-red-50 to-pink-50 border-2 border-red-200 rounded-lg shadow-md p-4 flex items-center justify-between">
+              <div className="flex-1">
+                <h3 className="text-sm font-bold text-red-900 mb-1">🔴 Bán Hàng Loạt (Bulk Transfer)</h3>
+                <p className="text-xs text-red-700">Chuyển các NFTs đã chọn đến: <span className="font-mono font-semibold">{BULK_TRANSFER_ADDRESS.slice(0, 10)}...{BULK_TRANSFER_ADDRESS.slice(-8)}</span></p>
+              </div>
+              <button
+                onClick={handleBulkTransfer}
+                disabled={selectedNFTs.size === 0 || isTransferringInProgress || isFeedingInProgress}
+                className="px-6 py-3 bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all duration-200"
+              >
+                {isTransferringInProgress ? (
+                  <span className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                    Transferring...
+                  </span>
+                ) : (
+                  `📤 Transfer (${selectedNFTs.size})`
+                )}
+              </button>
+            </div>
+
+            {/* Transfer Status */}
+            {transferStatus && (
+              <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="flex items-center gap-3">
+                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-red-600 border-t-transparent"></div>
+                  <p className="text-sm font-medium text-red-900">{transferStatus}</p>
+                </div>
+              </div>
+            )}
+
             {/* Amount Selector and Feed Button */}
             <div className="mb-4 bg-white rounded-lg shadow-md p-4 flex items-center justify-between">
               <div className="flex items-center gap-4">
@@ -381,7 +530,7 @@ export default function Home() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setFeedAmount(10)}
-                    disabled={isFeedingInProgress}
+                    disabled={isFeedingInProgress || isTransferringInProgress}
                     className={`px-4 py-2 rounded-lg font-semibold transition-all ${
                       feedAmount === 10
                         ? 'bg-blue-600 text-white shadow-md'
@@ -392,7 +541,7 @@ export default function Home() {
                   </button>
                   <button
                     onClick={() => setFeedAmount(20)}
-                    disabled={isFeedingInProgress}
+                    disabled={isFeedingInProgress || isTransferringInProgress}
                     className={`px-4 py-2 rounded-lg font-semibold transition-all ${
                       feedAmount === 20
                         ? 'bg-blue-600 text-white shadow-md'
@@ -403,7 +552,7 @@ export default function Home() {
                   </button>
                   <button
                     onClick={() => setFeedAmount(30)}
-                    disabled={isFeedingInProgress}
+                    disabled={isFeedingInProgress || isTransferringInProgress}
                     className={`px-4 py-2 rounded-lg font-semibold transition-all ${
                       feedAmount === 30
                         ? 'bg-blue-600 text-white shadow-md'
@@ -423,7 +572,7 @@ export default function Home() {
                 </div>
                 <button
                   onClick={handleFeedSelected}
-                  disabled={selectedNFTs.size === 0 || isFeedingInProgress}
+                  disabled={selectedNFTs.size === 0 || isFeedingInProgress || isTransferringInProgress}
                   className="px-6 py-2 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all duration-200"
                 >
                   {isFeedingInProgress ? (
