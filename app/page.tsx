@@ -207,7 +207,7 @@ export default function Home() {
           setTransferStatus(`✅ Transaction sent for ${nft.name}. Waiting for next...`);
           
           // Wait a bit before next transaction
-          await new Promise(resolve => setTimeout(resolve, 3000));
+          await new Promise(resolve => setTimeout(resolve, 2000));
           
           successCount++;
           console.log(`✅ Successfully transferred NFT #${nft.nftId}`);
@@ -216,7 +216,7 @@ export default function Home() {
           console.error(`❌ Failed to transfer NFT #${nft.nftId}:`, error);
           failCount++;
           setTransferStatus(`❌ Failed to transfer ${nft.name}. Continuing...`);
-          await new Promise(resolve => setTimeout(resolve, 3000));
+          await new Promise(resolve => setTimeout(resolve, 2000));
         }
       }
 
