@@ -298,8 +298,8 @@ export default function Home() {
           console.log(`✅ Transaction sent: ${txHash}`);
           setFeedingStatus(`✅ Transaction sent for ${nft.name}. Waiting for next...`);
           
-          // Wait a bit before next transaction
-          await new Promise(resolve => setTimeout(resolve, 5000));
+          // Wait for next transaction (optimized for Base network ~2s block time)
+          await new Promise(resolve => setTimeout(resolve, 2500));
           
           successCount++;
           console.log(`✅ Successfully fed NFT #${nft.nftId}`);
@@ -308,7 +308,7 @@ export default function Home() {
           console.error(`❌ Failed to feed NFT #${nft.nftId}:`, error);
           failCount++;
           setFeedingStatus(`❌ Failed to feed ${nft.name}. Continuing...`);
-          await new Promise(resolve => setTimeout(resolve, 5000));
+          await new Promise(resolve => setTimeout(resolve, 2500));
         }
       }
 
