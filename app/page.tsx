@@ -67,6 +67,8 @@ export default function Home() {
   const [feedingStatus, setFeedingStatus] = useState<string>("");
   const [isTransferringInProgress, setIsTransferringInProgress] = useState(false);
   const [transferStatus, setTransferStatus] = useState<string>("");
+  const [isPickingInProgress, setIsPickingInProgress] = useState(false);
+  const [pickingStatus, setPickingStatus] = useState<string>("");
 
   // Đảm bảo component đã mounted trước khi hiển thị wallet info
   useEffect(() => {
@@ -239,6 +241,109 @@ export default function Home() {
       setTimeout(() => setTransferStatus(""), 5000);
     } finally {
       setIsTransferringInProgress(false);
+    }
+  };
+
+  const handleBulkPickItem = async () => {
+    if (selectedNFTs.size === 0) {
+      setPickingStatus("⚠️ Please select NFTs to pick items!");
+      setTimeout(() => setPickingStatus(""), 3000);
+      return;
+    }
+
+    const selectedNFTsData = nfts.filter(nft => selectedNFTs.has(nft.nftId));
+    const nftsWithPickItems = selectedNFTsData.filter(nft => nft.pickItem && parseFloat(nft.pickItem.value) > 0);
+    
+    if (nftsWithPickItems.length === 0) {
+      setPickingStatus("⚠️ No NFTs with available pick items in selection!");
+      setTimeout(() => setPickingStatus(""), 3000);
+      return;
+    }
+
+    const confirmMessage = `Bạn có chắc muốn pick items cho ${nftsWithPickItems.length} NFTs?\n\nNFTs with items:\n${nftsWithPickItems.map(nft => `- ${nft.name} (#${nft.nftId})`).join('\n')}`;
+    
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
+    console.log(`🎁 Picking items for ${nftsWithPickItems.length} NFTs`);
+    console.log("NFTs to pick:", nftsWithPickItems.map(n => ({ id: n.nftId, name: n.name })));
+
+    setIsPickingInProgress(true);
+    setPickingStatus(`Starting to pick items for ${nftsWithPickItems.length} NFTs...`);
+
+    let successCount = 0;
+    let failCount = 0;
+
+    try {
+      for (let i = 0; i < nftsWithPickItems.length; i++) {
+        const nft = nftsWithPickItems[i];
+        
+        try {
+          setPickingStatus(`Picking item ${i + 1}/${nftsWithPickItems.length}: ${nft.name} (#${nft.nftId})...`);
+          
+          const payload = {
+            chainId: 8453,
+            address: nft.nftAddress.toLowerCase(),
+            id: nft.nftId.toString()
+          };
+          
+          console.log(`🎁 Picking item for NFT #${nft.nftId}:`, payload);
+          
+          const response = await fetch('https://pepe-api.eggle.xyz/nft/pick-item', {
+            method: 'POST',
+            headers: {
+              'accept': '*/*',
+              'content-type': 'application/json',
+              'from-bacoor-with-love': 'true',
+              'origin': 'https://eggle.xyz',
+              'referer': 'https://eggle.xyz/',
+            },
+            body: JSON.stringify(payload)
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+            console.log(`✅ Successfully picked item for NFT #${nft.nftId}:`, result);
+            setPickingStatus(`✅ Picked item for ${nft.name}. Waiting for next...`);
+            successCount++;
+          } else {
+            const error = await response.text();
+            console.error(`❌ Failed to pick item for NFT #${nft.nftId}:`, response.status, error);
+            failCount++;
+            setPickingStatus(`❌ Failed to pick item for ${nft.name}. Continuing...`);
+          }
+          
+          // Wait before next request to avoid rate limiting
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          
+        } catch (error) {
+          console.error(`❌ Error picking item for NFT #${nft.nftId}:`, error);
+          failCount++;
+          setPickingStatus(`❌ Error with ${nft.name}. Continuing...`);
+          await new Promise(resolve => setTimeout(resolve, 1500));
+        }
+      }
+
+      // Final summary
+      setPickingStatus(`✅ Pick Items Complete! Success: ${successCount}, Failed: ${failCount}`);
+      
+      // Reload NFTs
+      if (address) {
+        await loadNFTs(address, activeTab);
+      }
+      
+      // Clear selection
+      setSelectedNFTs(new Set());
+
+      setTimeout(() => setPickingStatus(""), 5000);
+
+    } catch (error) {
+      console.error("Error during pick items:", error);
+      setPickingStatus(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setTimeout(() => setPickingStatus(""), 5000);
+    } finally {
+      setIsPickingInProgress(false);
     }
   };
 
@@ -478,7 +583,7 @@ export default function Home() {
                 </h2>
                 <p className="text-gray-600 mt-1">
                   Found {nfts.length} NFT{nfts.length !== 1 ? "s" : ""} in your
-                  wallet • {nfts.filter(n => n.health !== 1).length} hungry • {selectedNFTs.size} selected
+                  wallet • {nfts.filter(n => n.health !== 1).length} hungry • {selectedNFTs.size} selected • 💩 Total Shit: {nfts.reduce((sum, nft) => sum + (nft.shits || 0), 0)}
                 </p>
               </div>
               <div className="flex items-center gap-3">
@@ -491,6 +596,8 @@ export default function Home() {
               </div>
             </div>
 
+          
+
             {/* Bulk Transfer Button */}
             <div className="mb-4 bg-gradient-to-r from-red-50 to-pink-50 border-2 border-red-200 rounded-lg shadow-md p-4 flex items-center justify-between">
               <div className="flex-1">
@@ -499,7 +606,7 @@ export default function Home() {
               </div>
               <button
                 onClick={handleBulkTransfer}
-                disabled={selectedNFTs.size === 0 || isTransferringInProgress || isFeedingInProgress}
+                disabled={selectedNFTs.size === 0 || isTransferringInProgress || isFeedingInProgress || isPickingInProgress}
                 className="px-6 py-3 bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all duration-200"
               >
                 {isTransferringInProgress ? (
@@ -523,6 +630,39 @@ export default function Home() {
               </div>
             )}
 
+
+  {/* Bulk Pick Item Button */}
+            <div className="mb-4 bg-gradient-to-r from-yellow-50 to-amber-50 border-2 border-yellow-300 rounded-lg shadow-md p-4 flex items-center justify-between">
+              <div className="flex-1">
+                <h3 className="text-sm font-bold text-yellow-900 mb-1">🎁 Pick Items Hàng Loạt (Bulk Pick)</h3>
+                <p className="text-xs text-yellow-700">Pick items từ các NFTs đã chọn (chỉ pick NFTs có items)</p>
+              </div>
+              <button
+                onClick={handleBulkPickItem}
+                disabled={selectedNFTs.size === 0 || isPickingInProgress || isTransferringInProgress || isFeedingInProgress}
+                className="px-6 py-3 bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-600 hover:to-amber-700 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all duration-200"
+              >
+                {isPickingInProgress ? (
+                  <span className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                    Picking...
+                  </span>
+                ) : (
+                  `🎁 Pick Items (${selectedNFTs.size})`
+                )}
+              </button>
+            </div>
+
+            {/* Pick Status */}
+            {pickingStatus && (
+              <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="flex items-center gap-3">
+                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-yellow-600 border-t-transparent"></div>
+                  <p className="text-sm font-medium text-yellow-900">{pickingStatus}</p>
+                </div>
+              </div>
+            )}
+            
             {/* Amount Selector and Feed Button */}
             <div className="mb-4 bg-white rounded-lg shadow-md p-4 flex items-center justify-between">
               <div className="flex items-center gap-4">
@@ -530,7 +670,7 @@ export default function Home() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setFeedAmount(10)}
-                    disabled={isFeedingInProgress || isTransferringInProgress}
+                    disabled={isFeedingInProgress || isTransferringInProgress || isPickingInProgress}
                     className={`px-4 py-2 rounded-lg font-semibold transition-all ${
                       feedAmount === 10
                         ? 'bg-blue-600 text-white shadow-md'
@@ -541,7 +681,7 @@ export default function Home() {
                   </button>
                   <button
                     onClick={() => setFeedAmount(20)}
-                    disabled={isFeedingInProgress || isTransferringInProgress}
+                    disabled={isFeedingInProgress || isTransferringInProgress || isPickingInProgress}
                     className={`px-4 py-2 rounded-lg font-semibold transition-all ${
                       feedAmount === 20
                         ? 'bg-blue-600 text-white shadow-md'
@@ -552,7 +692,7 @@ export default function Home() {
                   </button>
                   <button
                     onClick={() => setFeedAmount(30)}
-                    disabled={isFeedingInProgress || isTransferringInProgress}
+                    disabled={isFeedingInProgress || isTransferringInProgress || isPickingInProgress}
                     className={`px-4 py-2 rounded-lg font-semibold transition-all ${
                       feedAmount === 30
                         ? 'bg-blue-600 text-white shadow-md'
@@ -572,7 +712,7 @@ export default function Home() {
                 </div>
                 <button
                   onClick={handleFeedSelected}
-                  disabled={selectedNFTs.size === 0 || isFeedingInProgress || isTransferringInProgress}
+                  disabled={selectedNFTs.size === 0 || isFeedingInProgress || isTransferringInProgress || isPickingInProgress}
                   className="px-6 py-2 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all duration-200"
                 >
                   {isFeedingInProgress ? (
