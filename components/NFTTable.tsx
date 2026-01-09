@@ -30,9 +30,12 @@ export default function NFTTable({ nfts, selectedNFTs, onToggleSelect, onSelectA
       if (!confirm) return;
     }
 
-    selectedNFTsList.forEach(nft => {
-      const url = `https://eggle.xyz/en/nft/8453/${nft.nftAddress}/${nft.nftId}`;
-      window.open(url, '_blank');
+    // Open tabs with a small delay to avoid popup blockers
+    selectedNFTsList.forEach((nft, index) => {
+      setTimeout(() => {
+        const url = `https://eggle.xyz/en/nft/8453/${nft.nftAddress}/${nft.nftId}`;
+        window.open(url, '_blank');
+      }, index * 100); // 100ms delay between each tab
     });
   };
 
@@ -89,9 +92,33 @@ export default function NFTTable({ nfts, selectedNFTs, onToggleSelect, onSelectA
     );
   }
 
+  const handleSelectFirst = (count: number) => {
+    onDeselectAll();
+    const firstNFTs = nfts.slice(0, count);
+    firstNFTs.forEach(nft => onToggleSelect(nft.nftId));
+  };
+
+  const handleSelectLast = (count: number) => {
+    onDeselectAll();
+    const lastNFTs = nfts.slice(-count);
+    lastNFTs.forEach(nft => onToggleSelect(nft.nftId));
+  };
+
   return (
     <div className="overflow-x-auto">
-      <div className="mb-4 flex justify-end">
+      <div className="mb-4 flex justify-end gap-2">
+        <button
+          onClick={() => handleSelectFirst(10)}
+          className="px-3 py-2 bg-gradient-to-r from-blue-400 to-blue-500 hover:from-blue-500 hover:to-blue-600 text-white text-sm font-semibold rounded-lg shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105"
+        >
+          📋 10 con đầu
+        </button>
+        <button
+          onClick={() => handleSelectLast(10)}
+          className="px-3 py-2 bg-gradient-to-r from-green-400 to-green-500 hover:from-green-500 hover:to-green-600 text-white text-sm font-semibold rounded-lg shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105"
+        >
+          📋 10 con cuối
+        </button>
         <button
           onClick={handleOpenAll}
           disabled={selectedNFTs.size === 0}
