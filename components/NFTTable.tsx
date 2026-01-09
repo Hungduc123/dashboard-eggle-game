@@ -17,6 +17,25 @@ export default function NFTTable({ nfts, selectedNFTs, onToggleSelect, onSelectA
   const allSelected = nfts.length > 0 && nfts.every(nft => selectedNFTs.has(nft.nftId));
   const [pickingItems, setPickingItems] = useState<Set<string>>(new Set());
 
+  const handleOpenAll = () => {
+    const selectedNFTsList = nfts.filter(nft => selectedNFTs.has(nft.nftId));
+    
+    if (selectedNFTsList.length === 0) {
+      alert('Please select at least one NFT to open');
+      return;
+    }
+
+    if (selectedNFTsList.length > 10) {
+      const confirm = window.confirm(`You are about to open ${selectedNFTsList.length} tabs. Continue?`);
+      if (!confirm) return;
+    }
+
+    selectedNFTsList.forEach(nft => {
+      const url = `https://eggle.xyz/en/nft/8453/${nft.nftAddress}/${nft.nftId}`;
+      window.open(url, '_blank');
+    });
+  };
+
   const handlePickItem = async (nft: NFT) => {
     setPickingItems(prev => new Set(prev).add(nft.nftId));
     
@@ -72,6 +91,15 @@ export default function NFTTable({ nfts, selectedNFTs, onToggleSelect, onSelectA
 
   return (
     <div className="overflow-x-auto">
+      <div className="mb-4 flex justify-end">
+        <button
+          onClick={handleOpenAll}
+          disabled={selectedNFTs.size === 0}
+          className="px-4 py-2 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105"
+        >
+          🚀 Open All Selected ({selectedNFTs.size})
+        </button>
+      </div>
       <table className="min-w-full bg-white border border-gray-200 rounded-lg overflow-hidden shadow-md">
         <thead className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
           <tr>
